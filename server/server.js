@@ -1,31 +1,27 @@
-const express = require("express");
-const cors = require('cors');
-const midi = require('midi');
-const bodyParser = require('body-parser')
+const io = require('socket.io')(4000, {
+  cors: {
+    origin: ['http://192.168.1.164:3000']
+  }
+})
 
+console.log(io)
 
-const app = express();
+io.on('connection', socket => {
+  console.log(socket.id)
 
-app.use(cors());
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({extended: false}));
+  // Receive Custom Message
+  socket.on('select-mode', message => {
+    console.log(message)
+  })
 
-const PORT = process.env.PORT || 3001;
-const inputFrequency = 1000;
+  // Send Custom Message
+  // io.emit('key-pressed', "KEY")
 
-
-// Set up a new input.
-const input = new midi.Input();
-
-// Count the available input ports.
-let portCount = input.getPortCount();
-
-// Get the name of a specified input port.
-let firstPort = input.getPortName(0);
-// console.log(firstPort)
-
-let keyPressed = false;
-let currentData = null;
+  socket.on('disconnect', reason => {
+    console.log('Disconnected from client')
+  })
+  
+})
 
 let channelCodes = {
   noteOff: [128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143],
@@ -36,13 +32,21 @@ let channelCodes = {
 
 
 
+
+
+const midi = require('midi');
+
+// Set up a new input.
+const input = new midi.Input();
+
+// Count the available input ports.
+input.getPortCount();
+
+// Get the name of a specified input port.
+// input.getPortName(0);
+
 // Configure a callback.
 input.on('message', (deltaTime, message) => {
-  // The message is an array of numbers corresponding to the MIDI bytes:
-  //   [status, data1, data2]
-  // https://www.cs.cf.ac.uk/Dave/Multimedia/node158.html has some helpful
-  // information interpreting the messages.
-  // res.json({ message: "HELLO" });
 
   let statusCode = message[0];
   let currentNote = message[1];
@@ -72,52 +76,20 @@ input.on('message', (deltaTime, message) => {
     currentChannel = channelCodes.controlChange.indexOf(statusCode) + 1
   }
 
-  console.log(`Channel: ${currentChannel}, Type: ${currentType}, Status: ${currentStatus}`)
-
-  currentData = {
+  let midiEvent = {
+    portsActive: input.getPortCount(),
     channel: currentChannel,
     type: currentType,
     status: currentStatus,
     note: currentNote,
     value: currentValue
   }
-  // console.log(`m: ${message} d: ${deltaTime}`);
+
+
+  io.emit('key-pressed', midiEvent)
 });
-
-setInterval(() => {
-
-}, inputFrequency)
 
 // Open the first available input port.
 input.openPort(1);
 
-// Sysex, timing, and active sensing messages are ignored
-// by default. To enable these message types, pass false for
-// the appropriate type in the function below.
-// Order: (Sysex, Timing, Active Sensing)
-// For example if you want to receive only MIDI Clock beats
-// you should use
-// input.ignoreTypes(true, false, true)
 input.ignoreTypes(false, false, false);
-
-// ... receive MIDI messages ...
-
-// Close the port when done.
-// setTimeout(function() {
-//   input.closePort();
-// }, 100000);
-
-
-
-// console.log(app)
-
-app.get("/api", (req, res) => {
-  res.json({ 
-    devices: portCount,
-    message: currentData
-  });
-});
-
-app.listen(PORT, () => {
-  console.log(`Server listening on ${PORT}`);
-});

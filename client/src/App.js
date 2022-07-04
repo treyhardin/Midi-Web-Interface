@@ -1,57 +1,68 @@
 import logo from './logo.svg';
 import './App.css';
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import MIDIInput from './components/midi-input/midi-input';
 
-function App() {
-  const [data, setData] = React.useState(null);
+import { io } from 'socket.io-client'
 
-  // React.useEffect(() => {
-  //   fetch("/api")
-  //     .then((res) => res.json())
-  //     .then((data) => setData(data.message));
-  // }, []);
+function App() {
 
   
 
-  React.useEffect(() => {
-    setInterval(() => {
-      fetch("http://192.168.1.164:3001/api")
-        .then((res) => {
-          if (res.ok) {
-            return res.json()
-          } else {
-            return console.log("Fetch Error")
-          }
-          
-        })
-        .then((data) => setData(data));
-      // console.log(data)
-    }, 10)
+  const [isConnected, setIsConnected] = useState(null);
+  const [note, setNote] = useState(null)
+  const [channel, setChannel] = useState(null)
+  const [noteValue, setNoteValue] = useState(null)
+  const [inputType, setInputType] = useState(null)
+  const [inputStatus, setInputStatus] = useState(null)
+  const [ports, setPorts] = useState(null)
+  
+
+
+  
+
+  useEffect(() => {
+    const socket = io("http://192.168.1.164:4000")
     
+    socket.on('connect', (message) => {
+      setIsConnected(true);
+      console.log(`Connected to MIDI Server`)
+      setPorts(message)
+    });
+
+    socket.on('disconnect', () => {
+      setIsConnected(false);
+    });
+
+    socket.on('key-pressed', (data) => {
+      setPorts(data.portsActive)
+      setChannel(data.channel)
+      setInputType(data.type)
+      setInputStatus(data.status)
+      setNote(data.note)
+      setNoteValue(data.value)
+      console.log("Key Pressed")
+    })
+
+    return () => {
+      socket.off('connect');
+      socket.off('disconnect');
+      socket.off('key-pressed');
+    };
   }, []);
 
-  // requestAnimationFrame(() => {
-  //   let i = 0
-  //   console.log(i)
-  //   setData(i)
-  //   i++
-  // })
-
-  // var interval = setInterval(() => {
-  //   fetch("http://192.168.1.164:3001/api")
-  //     .then((res) => res.json())
-  //     .then((data) => setData(data.message));
-  // },100);
+  const root = document.documentElement;
+  root.style.setProperty('--value', noteValue);
 
   return (
     <div className="App">
       <MIDIInput />
       <header className="App-header">
-        <p>{!data ? "Loading..." : `${data.devices} Device(s) Found`}</p>
-        <p>{data ? `Note: ${data.message.note}` : "No Note"}</p>
-        <p>{data ? `Channel: ${data.message.channel}` : "No Channel"}</p>
-        <p>{data ? `Value: ${data.message.value}` : "No Data"}</p>
+        <p>{!ports ? "Loading..." : `${ports} Device(s) Found`}</p>
+        <p>{note ? `Note: ${note}` : "No Note"}</p>
+        <p>{channel ? `Channel: ${channel}` : "No Channel"}</p>
+        <p>{noteValue ? `Value: ${noteValue}` : "No Data"}</p>
+        <p>{inputType ? `Type: ${inputType}` : "No Input"}</p>
       </header>
     </div>
   );
